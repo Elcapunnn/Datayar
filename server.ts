@@ -942,6 +942,11 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     });
   });
 
+  // Skip static serving & standalone listener on Vercel (handled via Vercel CDN + api/[...path].ts)
+  if (process.env.VERCEL) {
+    return;
+  }
+
   const distPath = path.join(process.cwd(), 'dist');
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
@@ -956,17 +961,8 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
     }
-    const rootIndexPath = path.join(process.cwd(), 'index.html');
-    if (fs.existsSync(rootIndexPath)) {
-      return res.sendFile(rootIndexPath);
-    }
     res.status(200).send('<!DOCTYPE html><html><head><title>Dataset Search Agent</title></head><body><div id="root"></div></body></html>');
   });
-
-  // Skip standalone listener on Vercel (handled via Vercel Serverless Functions)
-  if (process.env.VERCEL) {
-    return;
-  }
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
