@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
@@ -941,26 +942,37 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     });
   });
 
-  // Skip standalone listener on Vercel (handled via Vercel CDN + api/index.ts)
+  const distPath = path.join(process.cwd(), 'dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+  }
+
+  // SPA catch-all route handler for non-API endpoints
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api') || req.path === '/health') {
+      return next();
+    }
+    const indexPath = path.join(distPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+    res.status(200).send('Dataset Search Agent API is running.');
+  });
+
+  // Skip standalone listener on Vercel (handled via Vercel Serverless Functions)
   if (process.env.VERCEL) {
     return;
   }
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Vite middleware for development & static serving for production
+  // Vite middleware for local development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
