@@ -4,7 +4,6 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
 import { 
   DatasetItem, 
   SearchResponseData, 
@@ -964,8 +963,9 @@ async function startServer() {
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Vite middleware for local development
-  if (process.env.NODE_ENV !== 'production') {
+  // Vite middleware for local development only
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
