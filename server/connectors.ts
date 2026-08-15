@@ -555,7 +555,7 @@ export async function fetchGitHubRepositories(subQueries: string[]): Promise<Dat
             title: item.full_name,
             authorOrOrg: item.owner?.login || item.full_name.split('/')[0],
             platform: 'github',
-            itemType: 'code',
+            itemType: 'code_repository',
             url: item.html_url,
             description: item.description || `GitHub repository: ${item.full_name}`,
             modality: 'code',

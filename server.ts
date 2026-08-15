@@ -946,7 +946,7 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     return;
   }
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Vite middleware for development & static serving for production
   if (process.env.NODE_ENV !== 'production') {
