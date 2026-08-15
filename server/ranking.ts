@@ -1,5 +1,5 @@
-import { DatasetItem, ScoreBreakdown } from '../src/types.ts';
-import { AnalyzedQuery } from './queryAnalyzer.ts';
+import { DatasetItem, ScoreBreakdown } from '../src/types';
+import { AnalyzedQuery } from './queryAnalyzer';
 
 const REPUTABLE_ORGS = new Set([
   'facebookresearch',

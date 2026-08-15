@@ -6,8 +6,8 @@ import {
   AlertTriangle, 
   Loader2
 } from 'lucide-react';
-import { DatasetItem } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { DatasetItem } from '../types';
+import { translations } from '../i18n';
 
 interface ComparisonModalProps {
   items: DatasetItem[];

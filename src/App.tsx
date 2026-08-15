@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Navbar } from './components/Navbar.tsx';
-import { SearchHero } from './components/SearchHero.tsx';
-import { AiAgentSummary } from './components/AiAgentSummary.tsx';
-import { FilterBar } from './components/FilterBar.tsx';
-import { DatasetCard } from './components/DatasetCard.tsx';
-import { DatasetDetailModal } from './components/DatasetDetailModal.tsx';
-import { ComparisonModal } from './components/ComparisonModal.tsx';
-import { ComparisonDrawer } from './components/ComparisonDrawer.tsx';
-import { BookmarksDrawer } from './components/BookmarksDrawer.tsx';
-import { ExportModal } from './components/ExportModal.tsx';
+import { Navbar } from './components/Navbar';
+import { SearchHero } from './components/SearchHero';
+import { AiAgentSummary } from './components/AiAgentSummary';
+import { FilterBar } from './components/FilterBar';
+import { DatasetCard } from './components/DatasetCard';
+import { DatasetDetailModal } from './components/DatasetDetailModal';
+import { ComparisonModal } from './components/ComparisonModal';
+import { ComparisonDrawer } from './components/ComparisonDrawer';
+import { BookmarksDrawer } from './components/BookmarksDrawer';
+import { ExportModal } from './components/ExportModal';
 import { 
   DatasetItem, 
   SearchResponseData, 
   SearchFilters, 
   ModalityType, 
   PlatformSource
-} from './types.ts';
-import { translations } from './i18n.ts';
-import { fetchJson } from './utils/api.ts';
+} from './types';
+import { translations } from './i18n';
+import { fetchJson } from './utils/api';
 import { 
   Loader2, 
   Database, 

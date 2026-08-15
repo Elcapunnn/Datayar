@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   Sparkles
 } from 'lucide-react';
-import { translations } from '../i18n.ts';
+import { translations } from '../i18n';
 
 interface NavbarProps {
   bookmarksCount: number;

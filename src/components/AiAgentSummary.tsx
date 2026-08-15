@@ -8,8 +8,8 @@ import {
   Users2, 
   Cpu
 } from 'lucide-react';
-import { SearchAgentSummary } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { SearchAgentSummary } from '../types';
+import { translations } from '../i18n';
 
 interface AiAgentSummaryProps {
   summary: SearchAgentSummary;

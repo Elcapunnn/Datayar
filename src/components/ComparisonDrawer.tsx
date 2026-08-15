@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layers, X, Play } from 'lucide-react';
-import { DatasetItem } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { DatasetItem } from '../types';
+import { translations } from '../i18n';
 
 interface ComparisonDrawerProps {
   items: DatasetItem[];

@@ -6,8 +6,8 @@ import {
   Database,
   Code2
 } from 'lucide-react';
-import { SearchFilters } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { SearchFilters } from '../types';
+import { translations } from '../i18n';
 
 interface FilterBarProps {
   filters: SearchFilters;

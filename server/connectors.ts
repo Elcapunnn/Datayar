@@ -7,7 +7,7 @@ import {
   PlatformSource,
   ConnectorHealthReport,
   SourceHealthStatus
-} from '../src/types.ts';
+} from '../src/types';
 
 // High-efficiency In-Memory TTL Cache for External Connectors (Render rate-limit protection)
 interface CacheEntry<T> {

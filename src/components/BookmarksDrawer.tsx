@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bookmark, X, Trash2, ArrowUpRight } from 'lucide-react';
-import { DatasetItem } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { DatasetItem } from '../types';
+import { translations } from '../i18n';
 
 interface BookmarksDrawerProps {
   isOpen: boolean;

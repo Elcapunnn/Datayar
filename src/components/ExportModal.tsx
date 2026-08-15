@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Download, FileText } from 'lucide-react';
-import { SearchResponseData, DatasetItem } from '../types.ts';
-import { translations } from '../i18n.ts';
+import { SearchResponseData, DatasetItem } from '../types';
+import { translations } from '../i18n';
 
 interface ExportModalProps {
   isOpen: boolean;

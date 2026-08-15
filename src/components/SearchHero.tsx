@@ -10,8 +10,8 @@ import {
   Code2,
   Boxes
 } from 'lucide-react';
-import { translations, quickPresets } from '../i18n.ts';
-import { ModalityType, PlatformSource } from '../types.ts';
+import { translations, quickPresets } from '../i18n';
+import { ModalityType, PlatformSource } from '../types';
 
 interface SearchHeroProps {
   searchQuery: string;

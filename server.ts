@@ -9,16 +9,16 @@ import {
   SearchResponseData, 
   ApiErrorResponse, 
   SourceQueryResult,
-} from './src/types.ts';
-import { analyzeQuery } from './server/queryAnalyzer.ts';
+} from './src/types';
+import { analyzeQuery } from './server/queryAnalyzer';
 import { 
   fetchHuggingFaceDatasets, 
   fetchGitHubRepositories, 
   fetchOpenMLDatasets, 
   fetchKaggleDatasets,
   checkConnectorsHealth
-} from './server/connectors.ts';
-import { fuseAndRankResults } from './server/ranking.ts';
+} from './server/connectors';
+import { fuseAndRankResults } from './server/ranking';
 
 dotenv.config();
 

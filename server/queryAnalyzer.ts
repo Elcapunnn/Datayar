@@ -1,4 +1,4 @@
-import { StandardModality } from '../src/types.ts';
+import { StandardModality } from '../src/types';
 
 export interface AnalyzedQuery {
   rawQuery: string;

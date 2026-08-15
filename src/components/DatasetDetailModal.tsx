@@ -20,9 +20,9 @@ import {
   HelpCircle,
   Sparkles
 } from 'lucide-react';
-import { DatasetItem } from '../types.ts';
-import { translations } from '../i18n.ts';
-import { fetchJson } from '../utils/api.ts';
+import { DatasetItem } from '../types';
+import { translations } from '../i18n';
+import { fetchJson } from '../utils/api';
 
 interface DatasetDetailModalProps {
   item: DatasetItem | null;
