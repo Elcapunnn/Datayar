@@ -373,19 +373,18 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
 
 export const app = express();
 
+app.use(express.json({ limit: '5mb' }));
+
+// Middleware: Rate limiting and Request ID
+app.use('/api', apiRateLimiter);
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  const reqId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  res.setHeader('x-request-id', reqId);
+  (req as any).requestId = reqId;
+  next();
+});
+
 async function startServer() {
-  const PORT = process.env.PORT || 3000;
-
-  app.use(express.json({ limit: '5mb' }));
-
-  // Middleware: Rate limiting and Request ID
-  app.use('/api', apiRateLimiter);
-  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    const reqId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
-    res.setHeader('x-request-id', reqId);
-    (req as any).requestId = reqId;
-    next();
-  });
 
   // Render Health Check Endpoint
   app.get('/health', (req, res) => {
@@ -941,6 +940,13 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
       requestId,
     });
   });
+
+  // Skip standalone listener on Vercel (handled via Vercel CDN + api/index.ts)
+  if (process.env.VERCEL) {
+    return;
+  }
+
+  const PORT = process.env.PORT || 3000;
 
   // Vite middleware for development & static serving for production
   if (process.env.NODE_ENV !== 'production') {
