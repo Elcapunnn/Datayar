@@ -385,15 +385,13 @@ app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-async function startServer() {
-
-  // Render Health Check Endpoint
-  app.get('/health', (req, res) => {
-    res.status(200).json({
-      success: true,
-      status: 'healthy',
-    });
+// Render & Vercel Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'healthy',
   });
+});
 
   // API Health check endpoint
   app.get('/api/health', (req, res) => {
@@ -942,11 +940,6 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     });
   });
 
-  // Skip static serving & standalone listener on Vercel (handled via Vercel CDN + api/[...path].ts)
-  if (process.env.VERCEL) {
-    return;
-  }
-
   const distPath = path.join(process.cwd(), 'dist');
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
@@ -963,6 +956,11 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     }
     res.status(200).send('<!DOCTYPE html><html><head><title>Dataset Search Agent</title></head><body><div id="root"></div></body></html>');
   });
+
+async function startServer() {
+  if (process.env.VERCEL) {
+    return;
+  }
 
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
