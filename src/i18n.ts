@@ -5,7 +5,7 @@ export const translations = {
     appTitle: 'AI Dataset & Code Discovery Platform',
     appSubtitle: 'Multi-source intelligent search across Hugging Face, GitHub, Kaggle, OpenML & PapersWithCode',
     companyBadge: 'Built for Machine Learning & Data Engineering Teams',
-    searchPlaceholder: 'Search datasets, models, or repos (e.g. sentiment analysis, faiss, chest x-ray, yolov8, churn)...',
+    searchPlaceholder: 'Search datasets or code repos (e.g. sentiment analysis, faiss, chest x-ray, yolov8, churn)...',
     searchButton: 'Search',
     searching: 'Querying live sources and computing AI quality scores...',
     aiOptimize: 'Query Expansion',
