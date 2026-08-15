@@ -371,8 +371,9 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: '5mb' }));
@@ -962,3 +963,5 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
 }
 
 startServer();
+
+export default app;
