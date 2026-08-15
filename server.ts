@@ -432,7 +432,7 @@ app.get('/health', (req, res) => {
     const startTime = Date.now();
 
     try {
-      const { query } = req.body;
+      const { query, modality } = req.body;
       if (!query || typeof query !== 'string' || !query.trim()) {
         const errorResp: ApiErrorResponse = {
           success: false,
@@ -447,7 +447,7 @@ app.get('/health', (req, res) => {
       }
 
       // Step A: Query Analysis & Sub-Query Formulation
-      const queryContext = analyzeQuery(query);
+      const queryContext = analyzeQuery(query, modality);
 
       // Step B: Parallel retrieval across connectors with time tracking
       const sourcesQueried: SourceQueryResult[] = [];

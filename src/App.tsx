@@ -182,7 +182,12 @@ export default function App() {
 
     // Modality filter
     if (selectedModality !== 'all') {
-      list = list.filter((item) => item.modality === selectedModality);
+      list = list.filter((item) => {
+        if (item.modality === selectedModality) return true;
+        if (selectedModality === 'vision' && item.standardModality === 'image') return true;
+        if (selectedModality === 'nlp' && item.standardModality === 'text') return true;
+        return false;
+      });
     }
 
     // Platform filter
@@ -221,7 +226,7 @@ export default function App() {
   }, [searchData, selectedModality, selectedPlatform, filters]);
 
   return (
-    <div className="min-h-screen bg-zinc-50/60 text-zinc-900 flex flex-col selection:bg-zinc-900 selection:text-white font-sans" dir="ltr">
+    <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col selection:bg-indigo-600 selection:text-white font-sans antialiased" dir="ltr">
       {/* Top Navigation */}
       <Navbar
         bookmarksCount={bookmarks.length}
@@ -248,19 +253,19 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         {/* Loading Overlay State */}
         {isLoading && !searchData && (
-          <div className="py-20 text-center space-y-3">
-            <div className="w-10 h-10 rounded-full bg-white border border-zinc-200 flex items-center justify-center mx-auto text-zinc-800 shadow-xs">
-              <Loader2 className="w-5 h-5 animate-spin" />
+          <div className="py-24 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-indigo-600 shadow-md shadow-slate-200/50">
+              <Loader2 className="w-6 h-6 animate-spin" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-zinc-800">
+              <h3 className="text-base font-bold text-slate-800 font-sans">
                 Querying live Hugging Face, GitHub & OpenML APIs...
               </h3>
-              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Auditing metadata, validating licensing categories, and ranking assets
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Extracting metadata, calculating multi-signal modality classification, and verifying licenses
               </p>
             </div>
           </div>
@@ -268,16 +273,16 @@ export default function App() {
 
         {/* Error State */}
         {searchError && (
-          <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-800 flex items-center justify-between gap-3 text-xs shadow-xs">
+            <div className="flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{searchError}</span>
+              <span className="font-medium">{searchError}</span>
             </div>
             <button
               onClick={() => handleSearch()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry</span>
             </button>
           </div>
@@ -307,35 +312,37 @@ export default function App() {
 
             {/* Results Display */}
             {allFiltered.length === 0 ? (
-              <div className="py-16 text-center rounded-xl bg-white border border-zinc-200/80 space-y-2">
-                <Search className="w-6 h-6 mx-auto text-zinc-400" />
-                <h4 className="text-sm font-medium text-zinc-700">
+              <div className="py-20 text-center rounded-2xl bg-white border border-slate-200/80 space-y-3 shadow-xs">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                  <Search className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">
                   No datasets or repositories match the current filters.
                 </h4>
-                <p className="text-xs text-zinc-400">
-                  Try changing your license or modality filters.
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Try switching modality tabs, clearing license restrictions, or using broader search keywords.
                 </p>
               </div>
             ) : filters.itemType === 'all' && datasetItems.length > 0 && repoItems.length > 0 ? (
               /* Grouped View: Datasets and Code Repositories separated cleanly */
-              <div className="space-y-8">
+              <div className="space-y-10">
                 {/* SECTION 1: DATASETS */}
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <Database className="w-4 h-4" />
                       </div>
-                      <h3 className="text-sm font-bold text-zinc-900">
+                      <h3 className="text-base font-bold text-slate-900">
                         Verified Datasets
                       </h3>
-                      <span className="text-xs font-mono font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                         {datasetItems.length}
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {datasetItems.map((item, index) => (
                       <DatasetCard
                         key={item.id}
@@ -352,22 +359,22 @@ export default function App() {
                 </section>
 
                 {/* SECTION 2: CODE REPOSITORIES */}
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
                         <Code2 className="w-4 h-4" />
                       </div>
-                      <h3 className="text-sm font-bold text-zinc-900">
+                      <h3 className="text-base font-bold text-slate-900">
                         Verified Code Repositories & Implementations
                       </h3>
-                      <span className="text-xs font-mono font-medium text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                         {repoItems.length}
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {repoItems.map((item, index) => (
                       <DatasetCard
                         key={item.id}
@@ -385,7 +392,7 @@ export default function App() {
               </div>
             ) : (
               /* Standard Single Grid View */
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allFiltered.map((item, index) => (
                   <DatasetCard
                     key={item.id}
@@ -450,13 +457,14 @@ export default function App() {
       />
 
       {/* Minimal Footer */}
-      <footer className="mt-auto border-t border-zinc-200 bg-white py-4 text-center text-xs text-zinc-500">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 font-medium text-zinc-700">
-            <span>AI Dataset & Code Discovery Platform</span>
+      <footer className="mt-auto border-t border-slate-200/80 bg-white/80 py-5 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-semibold text-slate-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Dataset & Code AI Discovery Platform</span>
           </div>
-          <div className="text-zinc-400 text-[11px] font-mono">
-            Hugging Face • GitHub • OpenML • Kaggle • PapersWithCode
+          <div className="text-slate-400 text-[11px] font-mono">
+            Hugging Face • GitHub • OpenML • Kaggle • Zero-Hallucination Retrieval
           </div>
         </div>
       </footer>

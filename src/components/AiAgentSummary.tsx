@@ -6,7 +6,9 @@ import {
   ShieldCheck, 
   Compass, 
   Users2, 
-  Cpu
+  Cpu,
+  Lightbulb,
+  ArrowRight
 } from 'lucide-react';
 import { SearchAgentSummary } from '../types';
 import { translations } from '../i18n';
@@ -21,30 +23,36 @@ export const AiAgentSummary: React.FC<AiAgentSummaryProps> = ({
   onSelectQuery,
 }) => {
   const t = translations.en;
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   if (!summary) return null;
 
   const executiveText = summary.executiveSummary;
 
   return (
-    <div className="mb-5 rounded-xl bg-white border border-zinc-200/90 p-4 shadow-xs">
-      {/* Top row: Summary lead */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-zinc-900 flex items-center justify-center text-white text-[11px] font-mono shrink-0 mt-0.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+    <div className="mb-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white p-5 shadow-lg shadow-indigo-950/20 border border-slate-800 relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Top Header Row */}
+      <div className="flex items-start justify-between gap-4 relative z-10">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-white shrink-0 mt-0.5 shadow-md shadow-indigo-500/30">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
+
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-zinc-900 font-sans">
-                AI Executive Briefing
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono flex items-center gap-1">
+                AI Synthesis & Evaluation
               </span>
-              <span className="text-[11px] text-zinc-400 font-mono">
-                ({summary.totalFound} {t.resultsCount})
+              <span className="text-[11px] bg-white/10 text-slate-300 px-2 py-0.5 rounded-full font-mono">
+                {summary.totalFound} candidates evaluated
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-700 leading-relaxed font-sans">
+
+            <p className="text-sm sm:text-[15px] text-slate-200 leading-relaxed font-sans font-normal">
               {executiveText}
             </p>
           </div>
@@ -52,70 +60,88 @@ export const AiAgentSummary: React.FC<AiAgentSummaryProps> = ({
 
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors shrink-0 cursor-pointer"
+          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer border border-white/10"
           title={isExpanded ? 'Collapse' : 'Expand'}
         >
           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
       </div>
 
-      {/* Expanded Breakdown */}
+      {/* Expanded 4-Pillar Scorecard & Tips */}
       {isExpanded && (
-        <div className="mt-4 pt-3 border-t border-zinc-100 space-y-3">
-          {/* Subtle Criteria Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-              <div className="flex items-center gap-1 text-zinc-700 font-medium mb-0.5">
-                <Compass className="w-3 h-3 text-zinc-500" />
+        <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-4 relative z-10">
+          {/* 4-Pillar Metric Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Relevance */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-indigo-500/40 transition-all">
+              <div className="flex items-center gap-1.5 text-cyan-400 font-semibold mb-1">
+                <Compass className="w-3.5 h-3.5" />
                 <span>{t.criteriaRelevance}</span>
               </div>
-              <p className="text-[11px] text-zinc-500 line-clamp-2">
-                {summary.criteriaBreakdown?.relevance || 'High correlation'}
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                {summary.criteriaBreakdown?.relevance || 'High intent correlation across queries.'}
               </p>
             </div>
 
-            <div className="p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-              <div className="flex items-center gap-1 text-emerald-700 font-medium mb-0.5">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            {/* License Safety */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/40 transition-all">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold mb-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
                 <span>{t.criteriaLicense}</span>
               </div>
-              <p className="text-[11px] text-zinc-500 line-clamp-2">
-                {summary.criteriaBreakdown?.licenseSafety || 'Commercial friendly'}
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                {summary.criteriaBreakdown?.licenseSafety || 'Commercial-friendly licenses audited.'}
               </p>
             </div>
 
-            <div className="p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-              <div className="flex items-center gap-1 text-zinc-700 font-medium mb-0.5">
-                <Users2 className="w-3 h-3 text-zinc-500" />
+            {/* Community Validation */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-amber-500/40 transition-all">
+              <div className="flex items-center gap-1.5 text-amber-400 font-semibold mb-1">
+                <Users2 className="w-3.5 h-3.5" />
                 <span>{t.criteriaCommunity}</span>
               </div>
-              <p className="text-[11px] text-zinc-500 line-clamp-2">
-                {summary.criteriaBreakdown?.communityValidation || 'Verified'}
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                {summary.criteriaBreakdown?.communityValidation || 'Verified community downloads & stars.'}
               </p>
             </div>
 
-            <div className="p-2 rounded-lg bg-zinc-50 border border-zinc-100">
-              <div className="flex items-center gap-1 text-zinc-700 font-medium mb-0.5">
-                <Cpu className="w-3 h-3 text-zinc-500" />
+            {/* Engineering Readiness */}
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/40 transition-all">
+              <div className="flex items-center gap-1.5 text-purple-400 font-semibold mb-1">
+                <Cpu className="w-3.5 h-3.5" />
                 <span>{t.criteriaEngineering}</span>
               </div>
-              <p className="text-[11px] text-zinc-500 line-clamp-2">
-                {summary.criteriaBreakdown?.engineeringReadiness || 'Ready to use'}
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                {summary.criteriaBreakdown?.engineeringReadiness || 'Ready-to-use Python loaders and splits.'}
               </p>
             </div>
           </div>
 
+          {/* Market Tips / Engineering Advice */}
+          {summary.marketTips && summary.marketTips.length > 0 && (
+            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-xs flex items-start gap-2.5">
+              <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-indigo-300 font-mono">Engineering Tip:</span>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {summary.marketTips[0]}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Related Queries */}
           {summary.suggestedRelatedQueries && summary.suggestedRelatedQueries.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-              <span className="text-zinc-400 text-[11px]">{t.relatedQueries}</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-slate-400 text-[11px] font-mono">{t.relatedQueries}</span>
               {summary.suggestedRelatedQueries.map((q, idx) => (
                 <button
                   key={idx}
                   onClick={() => onSelectQuery(q)}
-                  className="px-2 py-0.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white text-xs transition-all cursor-pointer border border-white/10"
                 >
-                  +{q}
+                  <span>{q}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
                 </button>
               ))}
             </div>
@@ -125,3 +151,4 @@ export const AiAgentSummary: React.FC<AiAgentSummaryProps> = ({
     </div>
   );
 };
+

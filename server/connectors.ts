@@ -134,75 +134,142 @@ export function categorizeLicenseStrict(licenseRaw: string | undefined | null): 
   };
 }
 
-// Convert Hugging Face pipeline tag to Standard Modality
-export function mapHfPipelineTagToModality(tag?: string): {
+// Multi-signal Smart Modality Classifier
+export function detectAccurateModality({
+  pipelineTag,
+  tags = [],
+  topics = [],
+  title = '',
+  description = '',
+  sourceId = '',
+  format = '',
+  platform = '',
+  language = '',
+  itemType = 'dataset',
+}: {
+  pipelineTag?: string;
+  tags?: string[];
+  topics?: string[];
+  title?: string;
+  description?: string;
+  sourceId?: string;
+  format?: string;
+  platform?: string;
+  language?: string;
+  itemType?: 'dataset' | 'code_repository';
+}): {
   modality: ModalityType;
   standardModality: StandardModality;
   modalityConfidence: 'high' | 'medium' | 'inferred';
   modalityReason: string;
 } {
-  if (!tag) {
-    return {
-      modality: 'nlp',
-      standardModality: 'text',
-      modalityConfidence: 'inferred',
-      modalityReason: 'Default text modality assigned in absence of pipeline tag.',
-    };
+  const combinedTags = [...(tags || []), ...(topics || []), pipelineTag || ''].map((t) => (t || '').toLowerCase());
+  const allText = `${title || ''} ${sourceId || ''} ${description || ''} ${combinedTags.join(' ')} ${format || ''}`.toLowerCase();
+
+  // 1. Direct Pipeline Tag inspection
+  if (pipelineTag) {
+    const pt = pipelineTag.toLowerCase();
+    if (pt.includes('speech') || pt.includes('audio') || pt.includes('voice') || pt.includes('sound') || pt.includes('asr') || pt.includes('tts')) {
+      return { modality: 'audio', standardModality: 'audio', modalityConfidence: 'high', modalityReason: `Derived from official pipeline tag "${pipelineTag}".` };
+    }
+    if (pt.includes('image') || pt.includes('vision') || pt.includes('object-detection') || pt.includes('segmentation') || pt.includes('depth') || pt.includes('keypoint')) {
+      return { modality: 'vision', standardModality: 'image', modalityConfidence: 'high', modalityReason: `Derived from official pipeline tag "${pipelineTag}".` };
+    }
+    if (pt.includes('multimodal') || pt.includes('visual-question-answering') || pt.includes('document-question-answering') || pt.includes('video')) {
+      return { modality: 'multimodal', standardModality: 'multimodal', modalityConfidence: 'high', modalityReason: `Derived from official pipeline tag "${pipelineTag}".` };
+    }
+    if (pt.includes('table') || pt.includes('tabular') || pt.includes('time-series')) {
+      return { modality: 'tabular', standardModality: 'tabular', modalityConfidence: 'high', modalityReason: `Derived from official pipeline tag "${pipelineTag}".` };
+    }
+    if (pt.includes('text') || pt.includes('nlp') || pt.includes('translation') || pt.includes('summarization') || pt.includes('fill-mask') || pt.includes('token-classification') || pt.includes('question-answering')) {
+      return { modality: 'nlp', standardModality: 'text', modalityConfidence: 'high', modalityReason: `Derived from official pipeline tag "${pipelineTag}".` };
+    }
   }
 
-  const t = tag.toLowerCase();
-
-  if (t.includes('speech') || t.includes('audio') || t.includes('voice') || t.includes('sound')) {
-    return {
-      modality: 'audio',
-      standardModality: 'audio',
-      modalityConfidence: 'high',
-      modalityReason: `Derived from official Hugging Face pipeline tag "${tag}".`,
-    };
+  // 2. Tag categories analysis (HF `task_categories:`, `task_ids:`, `modality:`, GitHub topics)
+  for (const tag of combinedTags) {
+    if (tag.includes('audio') || tag.includes('speech') || tag.includes('voice') || tag.includes('automatic-speech-recognition') || tag.includes('text-to-speech') || tag.includes('audio-classification')) {
+      return { modality: 'audio', standardModality: 'audio', modalityConfidence: 'high', modalityReason: `Derived from tag/topic "${tag}".` };
+    }
+    if (tag.includes('computer-vision') || tag.includes('image-classification') || tag.includes('object-detection') || tag.includes('image-segmentation') || tag.includes('image-to-image') || tag.includes('zero-shot-image-classification') || tag.includes('yolo') || tag.includes('depth-estimation') || tag.includes('unconditional-image-generation') || tag === 'cv' || tag === 'vision') {
+      return { modality: 'vision', standardModality: 'image', modalityConfidence: 'high', modalityReason: `Derived from tag/topic "${tag}".` };
+    }
+    if (tag.includes('multimodal') || tag.includes('vqa') || tag.includes('vision-language') || tag.includes('image-to-text') || tag.includes('text-to-image')) {
+      return { modality: 'multimodal', standardModality: 'multimodal', modalityConfidence: 'high', modalityReason: `Derived from tag/topic "${tag}".` };
+    }
+    if (tag.includes('tabular') || tag.includes('table') || tag.includes('time-series') || tag.includes('tabular-classification') || tag.includes('tabular-regression')) {
+      return { modality: 'tabular', standardModality: 'tabular', modalityConfidence: 'high', modalityReason: `Derived from tag/topic "${tag}".` };
+    }
+    if (tag.includes('reinforcement-learning') || tag.includes('gym') || tag.includes('robotics')) {
+      return { modality: 'reinforcement_learning', standardModality: 'unknown', modalityConfidence: 'high', modalityReason: `Derived from tag/topic "${tag}".` };
+    }
   }
 
-  if (t.includes('image') || t.includes('vision') || t.includes('object-detection') || t.includes('segmentation')) {
-    return {
-      modality: 'vision',
-      standardModality: 'image',
-      modalityConfidence: 'high',
-      modalityReason: `Derived from official Hugging Face pipeline tag "${tag}".`,
-    };
+  // 3. Known domain benchmarks (e.g. YOLO, COCO, ImageNet, Whisper, LibriSpeech, CIFAR, MNIST, SQuAD)
+  if (/(cifar|mnist|coco|imagenet|yolo|yolov\d|voc20|pascal[-_ ]?voc|celeba|openimages|cityscapes|kitti|svhn|fashion[-_ ]?mnist|oxford[-_ ]?pets|flowers102)/i.test(allText)) {
+    return { modality: 'vision', standardModality: 'image', modalityConfidence: 'high', modalityReason: 'Recognized canonical Computer Vision benchmark.' };
   }
 
-  if (t.includes('table') || t.includes('tabular') || t.includes('time-series')) {
-    return {
-      modality: 'tabular',
-      standardModality: 'tabular',
-      modalityConfidence: 'high',
-      modalityReason: `Derived from official Hugging Face pipeline tag "${tag}".`,
-    };
+  if (/(whisper|librispeech|common[-_ ]?voice|fleurs|vctk|voxceleb|timit|audiocraft|bark|coqui|speechcommands)/i.test(allText)) {
+    return { modality: 'audio', standardModality: 'audio', modalityConfidence: 'high', modalityReason: 'Recognized canonical Audio / Speech benchmark.' };
   }
 
-  if (t.includes('code') || t.includes('program')) {
-    return {
-      modality: 'code',
-      standardModality: 'code',
-      modalityConfidence: 'high',
-      modalityReason: `Derived from official Hugging Face pipeline tag "${tag}".`,
-    };
+  if (/(squad|glue|superglue|gsm8k|wikitext|imdb|ag_news|boolq|coqa|conll|flores|hazm|persian[-_ ]?sentiment|snli|mnli)/i.test(allText)) {
+    return { modality: 'nlp', standardModality: 'text', modalityConfidence: 'high', modalityReason: 'Recognized canonical NLP / Text dataset.' };
   }
 
-  if (t.includes('multimodal') || t.includes('visual-question-answering') || t.includes('document-question-answering')) {
-    return {
-      modality: 'multimodal',
-      standardModality: 'multimodal',
-      modalityConfidence: 'high',
-      modalityReason: `Derived from official Hugging Face pipeline tag "${tag}".`,
-    };
+  // 4. Keyword & Topic Heuristics
+  // Computer Vision
+  if (/(computer[-_ ]?vision|object[-_ ]?detection|image[-_ ]?classification|segmentation|chest[-_ ]?x[-_ ]?ray|xray|mri|lesion|bounding[-_ ]?box|bounding[-_ ]?boxes|yolo|torchvision|opencv|detectron|diffusion[-_ ]?model|stable[-_ ]?diffusion|faces)/i.test(allText)) {
+    return { modality: 'vision', standardModality: 'image', modalityConfidence: 'medium', modalityReason: 'Classified based on Computer Vision domain keywords.' };
+  }
+
+  // Audio / Speech
+  if (/(speech[-_ ]?recognition|transcription|speaker[-_ ]?diarization|sound[-_ ]?classification|audio[-_ ]?dataset|voice[-_ ]?cloning|tts|asr|audio[-_ ]?processing|waveform|wav|mp3)/i.test(allText)) {
+    return { modality: 'audio', standardModality: 'audio', modalityConfidence: 'medium', modalityReason: 'Classified based on Audio & Speech domain keywords.' };
+  }
+
+  // Multimodal / Video
+  if (/(multimodal|vision[-_ ]?language|clip[-_ ]?embeddings|video[-_ ]?dataset|vqa|visual[-_ ]?qa|text[-_ ]?to[-_ ]?video)/i.test(allText)) {
+    return { modality: 'multimodal', standardModality: 'multimodal', modalityConfidence: 'medium', modalityReason: 'Classified based on Multimodal domain keywords.' };
+  }
+
+  // Tabular / Structured
+  if (platform === 'openml' || /(tabular|credit[-_ ]?card|churn|fraud[-_ ]?detection|house[-_ ]?prices|titanic|housing|census|csv[-_ ]?dataset|arff|timeseries|time[-_ ]?series|ecg|arrhythmia)/i.test(allText)) {
+    return { modality: 'tabular', standardModality: 'tabular', modalityConfidence: 'medium', modalityReason: 'Classified based on Tabular / Structured data features.' };
+  }
+
+  // Reinforcement Learning
+  if (/(reinforcement[-_ ]?learning|openai[-_ ]?gym|mujoco|atari[-_ ]?benchmark|ppo|dqn|q[-_ ]?learning)/i.test(allText)) {
+    return { modality: 'reinforcement_learning', standardModality: 'unknown', modalityConfidence: 'medium', modalityReason: 'Classified based on Reinforcement Learning keywords.' };
+  }
+
+  // Code & Source Repositories
+  if (/(source[-_ ]?code|code[-_ ]?search|humaneval|mbpp|starcoder|the[-_ ]?stack|git[-_ ]?commits|programming[-_ ]?language)/i.test(allText)) {
+    return { modality: 'code', standardModality: 'code', modalityConfidence: 'medium', modalityReason: 'Classified based on Code & Programming dataset features.' };
+  }
+
+  // NLP / Text
+  if (/(nlp|natural[-_ ]?language|text[-_ ]?classification|sentiment|translation|language[-_ ]?model|llm|corpus|tokenization|question[-_ ]?answering|chat[-_ ]?dataset|instructions)/i.test(allText)) {
+    return { modality: 'nlp', standardModality: 'text', modalityConfidence: 'medium', modalityReason: 'Classified based on Natural Language Processing features.' };
+  }
+
+  // Default fallback based on platform & itemType
+  if (itemType === 'code_repository') {
+    return { modality: 'code', standardModality: 'code', modalityConfidence: 'inferred', modalityReason: 'Software codebase repository.' };
   }
 
   return {
     modality: 'nlp',
     standardModality: 'text',
-    modalityConfidence: 'medium',
-    modalityReason: `Mapped to text from tag "${tag}".`,
+    modalityConfidence: 'inferred',
+    modalityReason: 'Default text modality assigned.',
   };
+}
+
+// Backwards compatibility alias
+export function mapHfPipelineTagToModality(tag?: string) {
+  return detectAccurateModality({ pipelineTag: tag });
 }
 
 // -------------------------------------------------------------
@@ -225,7 +292,15 @@ export async function fetchHuggingFaceDirect(slug: string): Promise<DatasetItem 
     if (!item || !item.id) return null;
 
     const licenseInfo = categorizeLicenseStrict(item.cardData?.license || item.license);
-    const modalityInfo = mapHfPipelineTagToModality(item.pipeline_tag || (item.tags || []).find((t: string) => t.includes('task:')));
+    const modalityInfo = detectAccurateModality({
+      pipelineTag: item.pipeline_tag,
+      tags: item.tags,
+      title: item.id,
+      description: item.description,
+      sourceId: item.id,
+      platform: 'huggingface',
+      itemType: 'dataset',
+    });
 
     const isFa = (item.tags || []).some((t: string) => t.toLowerCase() === 'fa' || t.toLowerCase().includes('persian')) ||
                  (item.description || '').match(/[\u0600-\u06FF]/);
@@ -344,7 +419,15 @@ export async function fetchHuggingFaceDatasets(subQueries: string[]): Promise<Da
           }
 
           const licenseInfo = categorizeLicenseStrict(item.cardData?.license || item.license);
-          const modalityInfo = mapHfPipelineTagToModality(item.pipeline_tag || (item.tags || []).find((t: string) => t.includes('task:')));
+          const modalityInfo = detectAccurateModality({
+            pipelineTag: item.pipeline_tag,
+            tags: item.tags,
+            title: item.id,
+            description: item.description,
+            sourceId: item.id,
+            platform: 'huggingface',
+            itemType: 'dataset',
+          });
 
           const isFa = (item.tags || []).some((t: string) => t.toLowerCase() === 'fa' || t.toLowerCase().includes('persian')) ||
                        (item.description || '').match(/[\u0600-\u06FF]/);
@@ -432,6 +515,15 @@ export async function fetchGitHubDirect(owner: string, repo: string): Promise<Da
     if (!item || !item.full_name) return null;
 
     const licenseInfo = categorizeLicenseStrict(item.license?.spdx_id || item.license?.name);
+    const modalityInfo = detectAccurateModality({
+      topics: item.topics,
+      title: item.full_name,
+      description: item.description,
+      sourceId: item.full_name,
+      language: item.language,
+      platform: 'github',
+      itemType: 'code_repository',
+    });
     const isFa = (item.description || '').match(/[\u0600-\u06FF]/) || (item.topics || []).includes('persian');
     const stars = item.stargazers_count || 0;
 
@@ -445,10 +537,10 @@ export async function fetchGitHubDirect(owner: string, repo: string): Promise<Da
       itemType: 'code_repository',
       url: item.html_url,
       description: item.description || `Official GitHub repository for ${item.full_name}. Verified via GitHub API.`,
-      modality: 'code',
-      standardModality: 'code',
-      modalityConfidence: 'high',
-      modalityReason: 'Code repository with implementation scripts and model checkpoints.',
+      modality: modalityInfo.modality,
+      standardModality: modalityInfo.standardModality,
+      modalityConfidence: modalityInfo.modalityConfidence,
+      modalityReason: modalityInfo.modalityReason,
       languages: [item.language || 'Python'],
       starsOrDownloads: stars,
       downloadsStr: stars > 1000 ? `${(stars / 1000).toFixed(1)}k stars` : `${stars} stars`,
@@ -545,6 +637,15 @@ export async function fetchGitHubRepositories(subQueries: string[]): Promise<Dat
           }
 
           const licenseInfo = categorizeLicenseStrict(item.license?.spdx_id || item.license?.name);
+          const modalityInfo = detectAccurateModality({
+            topics: item.topics,
+            title: item.full_name,
+            description: item.description,
+            sourceId: item.full_name,
+            language: item.language,
+            platform: 'github',
+            itemType: 'code_repository',
+          });
           const isFa = (item.description || '').match(/[\u0600-\u06FF]/) || (item.topics || []).includes('persian');
           const stars = item.stargazers_count || 0;
 
@@ -558,10 +659,10 @@ export async function fetchGitHubRepositories(subQueries: string[]): Promise<Dat
             itemType: 'code_repository',
             url: item.html_url,
             description: item.description || `GitHub repository: ${item.full_name}`,
-            modality: 'code',
-            standardModality: 'code',
-            modalityConfidence: 'high',
-            modalityReason: 'Source repository hosted on GitHub.',
+            modality: modalityInfo.modality,
+            standardModality: modalityInfo.standardModality,
+            modalityConfidence: modalityInfo.modalityConfidence,
+            modalityReason: modalityInfo.modalityReason,
             languages: isFa ? ['fa', 'en'] : ['en'],
             starsOrDownloads: stars,
             downloadsStr: stars > 1000 ? `${(stars / 1000).toFixed(1)}k stars` : `${stars} stars`,
@@ -646,6 +747,14 @@ export async function fetchOpenMLDatasets(subQueries: string[]): Promise<Dataset
           if (resultsMap.has(itemId)) continue;
 
           const licenseInfo = categorizeLicenseStrict(entry.licence || entry.license || 'CC-BY-4.0');
+          const modalityInfo = detectAccurateModality({
+            title: entry.name,
+            description: entry.name,
+            sourceId: `openml/${entry.name}/${did}`,
+            format: entry.format,
+            platform: 'openml',
+            itemType: 'dataset',
+          });
           const runs = Number(entry.runs) || 0;
 
           resultsMap.set(itemId, {
@@ -657,11 +766,11 @@ export async function fetchOpenMLDatasets(subQueries: string[]): Promise<Dataset
             platform: 'openml',
             itemType: 'dataset',
             url: `https://www.openml.org/search?type=data&id=${did}`,
-            description: `OpenML standard tabular & vision benchmark dataset #${did}: "${entry.name}" (Version ${entry.version}). Format: ${entry.format || 'ARFF/CSV'}.`,
-            modality: entry.format?.toLowerCase() === 'sparse_arff' ? 'tabular' : 'tabular',
-            standardModality: 'tabular',
-            modalityConfidence: 'high',
-            modalityReason: 'Retrieved from OpenML benchmark repository.',
+            description: `OpenML standard tabular & ML benchmark dataset #${did}: "${entry.name}" (Version ${entry.version}). Format: ${entry.format || 'ARFF/CSV'}.`,
+            modality: modalityInfo.modality,
+            standardModality: modalityInfo.standardModality,
+            modalityConfidence: modalityInfo.modalityConfidence,
+            modalityReason: modalityInfo.modalityReason,
             languages: ['en'],
             sampleCount: entry.NumberOfInstances ? `${Number(entry.NumberOfInstances).toLocaleString()} rows` : undefined,
             starsOrDownloads: runs,
@@ -758,6 +867,13 @@ export async function fetchKaggleDatasets(subQueries: string[]): Promise<{ items
         if (resultsMap.has(itemId)) continue;
 
         const licenseInfo = categorizeLicenseStrict(item.licenseName);
+        const modalityInfo = detectAccurateModality({
+          title: item.ref,
+          description: item.title,
+          sourceId: item.ref,
+          platform: 'kaggle',
+          itemType: 'dataset',
+        });
         const downloads = Number(item.downloadCount) || 0;
         const votes = Number(item.voteCount) || 0;
 
@@ -771,10 +887,10 @@ export async function fetchKaggleDatasets(subQueries: string[]): Promise<{ items
           itemType: 'dataset',
           url: `https://www.kaggle.com/datasets/${item.ref}`,
           description: item.title || `Kaggle dataset: ${item.ref}. Total downloads: ${downloads}.`,
-          modality: 'tabular',
-          standardModality: 'tabular',
-          modalityConfidence: 'medium',
-          modalityReason: 'Kaggle community dataset repository.',
+          modality: modalityInfo.modality,
+          standardModality: modalityInfo.standardModality,
+          modalityConfidence: modalityInfo.modalityConfidence,
+          modalityReason: modalityInfo.modalityReason,
           languages: ['en'],
           starsOrDownloads: downloads,
           downloadsStr: downloads > 1000 ? `${(downloads / 1000).toFixed(1)}k dl` : `${downloads} dl`,

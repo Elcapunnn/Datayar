@@ -442,7 +442,7 @@ const NOISE_WORDS = [
   'database',
 ];
 
-export function analyzeQuery(rawQuery: string): AnalyzedQuery {
+export function analyzeQuery(rawQuery: string, requestedModality?: string): AnalyzedQuery {
   const query = (rawQuery || '').trim();
   const lowerQuery = query.toLowerCase();
 
@@ -499,6 +499,16 @@ export function analyzeQuery(rawQuery: string): AnalyzedQuery {
   const medicalEntities: string[] = [];
   const persianEntities: string[] = [];
   let detectedModality: StandardModality = 'unknown';
+
+  if (requestedModality && requestedModality !== 'all') {
+    const rm = requestedModality.toLowerCase();
+    if (rm === 'vision' || rm === 'image') detectedModality = 'image';
+    else if (rm === 'audio' || rm === 'speech') detectedModality = 'audio';
+    else if (rm === 'nlp' || rm === 'text') detectedModality = 'text';
+    else if (rm === 'tabular') detectedModality = 'tabular';
+    else if (rm === 'code') detectedModality = 'code';
+    else if (rm === 'multimodal') detectedModality = 'multimodal';
+  }
 
   for (const [key, val] of Object.entries(KNOWN_DATASET_MAPPINGS)) {
     if (lowerQuery.includes(key)) {
