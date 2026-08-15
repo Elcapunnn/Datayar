@@ -1,16 +1,6 @@
 import React from 'react';
-import { 
-  Search, 
-  X, 
-  Loader2,
-  FileText,
-  Image as ImageIcon,
-  Mic,
-  Table,
-  Code2,
-  Boxes
-} from 'lucide-react';
-import { translations, quickPresets } from '../i18n';
+import { Search, X, Loader2 } from 'lucide-react';
+import { translations } from '../i18n';
 import { ModalityType, PlatformSource } from '../types';
 
 interface SearchHeroProps {
@@ -18,10 +8,10 @@ interface SearchHeroProps {
   onSearchChange: (q: string) => void;
   onExecuteSearch: (customQuery?: string, customModality?: ModalityType) => void;
   isLoading: boolean;
-  selectedModality: ModalityType | 'all';
-  onSelectModality: (m: ModalityType | 'all') => void;
-  selectedPlatform: PlatformSource | 'all';
-  onSelectPlatform: (p: PlatformSource | 'all') => void;
+  selectedModality?: ModalityType | 'all';
+  onSelectModality?: (m: ModalityType | 'all') => void;
+  selectedPlatform?: PlatformSource | 'all';
+  onSelectPlatform?: (p: PlatformSource | 'all') => void;
 }
 
 export const SearchHero: React.FC<SearchHeroProps> = ({
@@ -29,19 +19,8 @@ export const SearchHero: React.FC<SearchHeroProps> = ({
   onSearchChange,
   onExecuteSearch,
   isLoading,
-  selectedModality,
-  onSelectModality,
 }) => {
   const t = translations.en;
-
-  const modalities: { key: ModalityType | 'all'; label: string; icon: React.ReactNode }[] = [
-    { key: 'all', label: t.modalityAll, icon: <Boxes className="w-3.5 h-3.5" /> },
-    { key: 'nlp', label: t.modalityNlp, icon: <FileText className="w-3.5 h-3.5" /> },
-    { key: 'vision', label: t.modalityVision, icon: <ImageIcon className="w-3.5 h-3.5" /> },
-    { key: 'audio', label: t.modalityAudio, icon: <Mic className="w-3.5 h-3.5" /> },
-    { key: 'tabular', label: t.modalityTabular, icon: <Table className="w-3.5 h-3.5" /> },
-    { key: 'code', label: t.modalityCode, icon: <Code2 className="w-3.5 h-3.5" /> },
-  ];
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +42,7 @@ export const SearchHero: React.FC<SearchHeroProps> = ({
         </div>
 
         {/* Search Input Box */}
-        <form onSubmit={handleFormSubmit} className="relative mb-3">
+        <form onSubmit={handleFormSubmit} className="relative mb-1">
           <div className="relative flex items-center bg-white rounded-xl border border-zinc-300 focus-within:border-zinc-900 focus-within:ring-2 focus-within:ring-zinc-900/5 transition-all shadow-2xs">
             <div className="ps-3.5 text-zinc-400">
               <Search className="w-4 h-4" />
@@ -101,48 +80,6 @@ export const SearchHero: React.FC<SearchHeroProps> = ({
             </button>
           </div>
         </form>
-
-        {/* Modality Filter Pills */}
-        <div className="flex items-center justify-center flex-wrap gap-1.5 py-1">
-          {modalities.map((m) => {
-            const isActive = selectedModality === m.key;
-            return (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => onSelectModality(m.key)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer ${
-                  isActive
-                    ? 'bg-zinc-900 text-white font-medium shadow-2xs'
-                    : 'bg-zinc-100 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200'
-                }`}
-              >
-                {m.icon}
-                <span>{m.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Quick Suggestion Tags */}
-        <div className="mt-2.5 text-center">
-          <div className="inline-flex items-center flex-wrap justify-center gap-1 text-[11px] text-zinc-500">
-            <span className="text-zinc-400 font-medium">Suggested:</span>
-            {quickPresets.slice(0, 4).map((preset, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  onSearchChange(preset.query);
-                  onExecuteSearch(preset.query, preset.modality as ModalityType);
-                }}
-                className="px-2 py-0.5 rounded-md hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer"
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
