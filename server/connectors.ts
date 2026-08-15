@@ -9,6 +9,32 @@ import {
   SourceHealthStatus
 } from '../src/types.ts';
 
+// High-efficiency In-Memory TTL Cache for External Connectors (Render rate-limit protection)
+interface CacheEntry<T> {
+  timestamp: number;
+  data: T;
+}
+const CONNECTOR_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
+const connectorCache = new Map<string, CacheEntry<any>>();
+
+export function getCachedConnectorData<T>(key: string): T | null {
+  const entry = connectorCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CONNECTOR_CACHE_TTL_MS) {
+    connectorCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+export function setCachedConnectorData<T>(key: string, data: T): void {
+  connectorCache.set(key, { timestamp: Date.now(), data });
+  if (connectorCache.size > 1000) {
+    const oldestKey = connectorCache.keys().next().value;
+    if (oldestKey) connectorCache.delete(oldestKey);
+  }
+}
+
 // Commercial-friendly SPDX IDs (strict allowlist)
 const COMMERCIAL_PERMISSIVE_LICENSES = new Set([
   'mit',
@@ -268,6 +294,10 @@ export async function fetchHuggingFaceDirect(slug: string): Promise<DatasetItem 
 }
 
 export async function fetchHuggingFaceDatasets(subQueries: string[]): Promise<DatasetItem[]> {
+  const cacheKey = `hf:${subQueries.slice().sort().join('|')}`;
+  const cached = getCachedConnectorData<DatasetItem[]>(cacheKey);
+  if (cached) return cached;
+
   const resultsMap = new Map<string, DatasetItem>();
   const uniqueSubQueries = Array.from(new Set(subQueries.map((q) => q.trim()).filter(Boolean)));
 
@@ -331,13 +361,12 @@ export async function fetchHuggingFaceDatasets(subQueries: string[]): Promise<Da
             platform: 'huggingface',
             itemType: 'dataset',
             url: `https://huggingface.co/datasets/${item.id}`,
-            description: item.description || `Hugging Face canonical dataset: ${item.id}. Verified live on Hub.`,
+            description: item.description || `Hugging Face dataset: ${item.id}`,
             modality: modalityInfo.modality,
             standardModality: modalityInfo.standardModality,
             modalityConfidence: modalityInfo.modalityConfidence,
             modalityReason: modalityInfo.modalityReason,
             languages: isFa ? ['fa', 'en'] : ['en'],
-            sizeStr: item.cardData?.dataset_info?.dataset_size ? `${(item.cardData.dataset_info.dataset_size / (1024 * 1024)).toFixed(1)} MB` : undefined,
             sampleCount: item.cardData?.dataset_info?.splits?.[0]?.num_examples ? `${item.cardData.dataset_info.splits[0].num_examples.toLocaleString()} samples` : undefined,
             starsOrDownloads: downloads,
             downloadsStr: downloads > 1000 ? `${(downloads / 1000).toFixed(1)}k dl` : `${downloads} dl`,
@@ -349,15 +378,14 @@ export async function fetchHuggingFaceDatasets(subQueries: string[]): Promise<Da
             licenseDisclaimer: licenseInfo.licenseDisclaimer,
             lastUpdated: item.lastModified ? new Date(item.lastModified).toISOString().split('T')[0] : 'Recently',
             tags: Array.isArray(item.tags) ? item.tags.slice(0, 8) : ['dataset'],
-            aiScore: 85,
-            aiRankReason: `Verified Hugging Face dataset matching query '${cleanQ}'.`,
+            aiScore: 90,
+            aiRankReason: `Retrieved from Hugging Face datasets with ${downloads.toLocaleString()} downloads.`,
             pros: [
-              'Live verified source on Hugging Face API',
-              'Python SDK native compatibility via `datasets` library',
-              licenseInfo.licenseCategory === 'commercial_friendly' ? 'Commercial-friendly license' : 'Requires license verification',
+              'Canonical dataset hosted on Hugging Face',
+              `Load via \`load_dataset('${item.id}')\``,
             ],
             cons: [
-              'Check token limits if fine-tuning with local memory restrictions',
+              'Verify dataset splits and bandwidth before training',
             ],
             codeSnippets: [
               {
@@ -379,7 +407,9 @@ export async function fetchHuggingFaceDatasets(subQueries: string[]): Promise<Da
     })
   );
 
-  return Array.from(resultsMap.values());
+  const results = Array.from(resultsMap.values());
+  setCachedConnectorData(cacheKey, results);
+  return results;
 }
 
 // -------------------------------------------------------------
@@ -460,6 +490,10 @@ export async function fetchGitHubDirect(owner: string, repo: string): Promise<Da
 }
 
 export async function fetchGitHubRepositories(subQueries: string[]): Promise<DatasetItem[]> {
+  const cacheKey = `gh:${subQueries.slice().sort().join('|')}`;
+  const cached = getCachedConnectorData<DatasetItem[]>(cacheKey);
+  if (cached) return cached;
+
   const resultsMap = new Map<string, DatasetItem>();
   const uniqueSubQueries = Array.from(new Set(subQueries.map((q) => q.trim()).filter(Boolean)));
 
@@ -519,36 +553,34 @@ export async function fetchGitHubRepositories(subQueries: string[]): Promise<Dat
             sourceId: item.full_name,
             canonicalUrl: item.html_url,
             title: item.full_name,
-            authorOrOrg: item.owner?.login || 'GitHub',
+            authorOrOrg: item.owner?.login || item.full_name.split('/')[0],
             platform: 'github',
-            itemType: 'code_repository',
+            itemType: 'code',
             url: item.html_url,
-            description: item.description || `GitHub repository for ${item.full_name}. Real live verified codebase.`,
+            description: item.description || `GitHub repository: ${item.full_name}`,
             modality: 'code',
             standardModality: 'code',
             modalityConfidence: 'high',
-            modalityReason: 'Code repository retrieved via GitHub API search.',
-            languages: [item.language || 'Python'],
+            modalityReason: 'Source repository hosted on GitHub.',
+            languages: isFa ? ['fa', 'en'] : ['en'],
             starsOrDownloads: stars,
             downloadsStr: stars > 1000 ? `${(stars / 1000).toFixed(1)}k stars` : `${stars} stars`,
             likes: stars,
-            forks: item.forks_count || 0,
             license: item.license?.spdx_id || item.license?.name || 'unknown',
             licenseCategory: licenseInfo.licenseCategory,
             licenseConfidence: licenseInfo.licenseConfidence,
             licenseSpdx: licenseInfo.licenseSpdx,
             licenseDisclaimer: licenseInfo.licenseDisclaimer,
-            lastUpdated: item.pushed_at ? new Date(item.pushed_at).toISOString().split('T')[0] : 'Recently',
-            tags: Array.isArray(item.topics) ? item.topics.slice(0, 8) : [item.language || 'code'],
+            lastUpdated: item.updated_at ? new Date(item.updated_at).toISOString().split('T')[0] : 'Recently',
+            tags: Array.isArray(item.topics) && item.topics.length > 0 ? item.topics.slice(0, 8) : ['github', 'repository', item.language || 'code'].filter(Boolean),
             aiScore: 88,
-            aiRankReason: `Verified GitHub repository with ${stars.toLocaleString()} stars matching query '${cleanQ}'.`,
+            aiRankReason: `Verified GitHub repository with ${stars.toLocaleString()} stars.`,
             pros: [
-              `Active open-source community with ${stars.toLocaleString()} stars`,
-              'Direct access to source code and training scripts',
-              licenseInfo.licenseCategory === 'commercial_friendly' ? 'Commercial-friendly license' : 'Requires license verification',
+              `Popular GitHub project with ${stars.toLocaleString()} stars`,
+              'Full source code and implementation',
             ],
             cons: [
-              'Requires manual dependency resolution and setup',
+              'Requires local Python/dependency installation',
             ],
             codeSnippets: [
               {
@@ -570,13 +602,18 @@ export async function fetchGitHubRepositories(subQueries: string[]): Promise<Dat
     })
   );
 
-  return Array.from(resultsMap.values());
+  const results = Array.from(resultsMap.values());
+  setCachedConnectorData(cacheKey, results);
+  return results;
 }
 
 // -------------------------------------------------------------
 // 3. OPENML CONNECTOR (Public Live REST API for Standard ML)
-// -------------------------------------------------------------
 export async function fetchOpenMLDatasets(subQueries: string[]): Promise<DatasetItem[]> {
+  const cacheKey = `openml:${subQueries.slice().sort().join('|')}`;
+  const cached = getCachedConnectorData<DatasetItem[]>(cacheKey);
+  if (cached) return cached;
+
   const resultsMap = new Map<string, DatasetItem>();
   const uniqueSubQueries = Array.from(new Set(subQueries.map((q) => q.trim()).filter(Boolean)));
 
@@ -655,7 +692,7 @@ export async function fetchOpenMLDatasets(subQueries: string[]): Promise<Dataset
               },
               {
                 language: 'python',
-                title: 'OpenML Python Client',
+                title: 'OpenML Python API',
                 code: `import openml\n\n# Fetch dataset details and features\ndataset = openml.datasets.get_dataset(${did})\nX, y, categorical_indicator, attribute_names = dataset.get_data(\n    dataset_format="dataframe", target=dataset.default_target_attribute\n)\nprint(X.info())`,
               }
             ],
@@ -672,7 +709,9 @@ export async function fetchOpenMLDatasets(subQueries: string[]): Promise<Dataset
     })
   );
 
-  return Array.from(resultsMap.values());
+  const results = Array.from(resultsMap.values());
+  setCachedConnectorData(cacheKey, results);
+  return results;
 }
 
 // -------------------------------------------------------------
@@ -688,6 +727,10 @@ export async function fetchKaggleDatasets(subQueries: string[]): Promise<{ items
       status: 'auth_required',
     };
   }
+
+  const cacheKey = `kaggle:${subQueries.slice().sort().join('|')}`;
+  const cached = getCachedConnectorData<{ items: DatasetItem[]; status: SourceHealthStatus }>(cacheKey);
+  if (cached) return cached;
 
   const resultsMap = new Map<string, DatasetItem>();
   const authHeader = `Basic ${Buffer.from(`${username}:${key}`).toString('base64')}`;
@@ -771,10 +814,12 @@ export async function fetchKaggleDatasets(subQueries: string[]): Promise<{ items
     }
   }
 
-  return {
+  const resObj = {
     items: Array.from(resultsMap.values()),
-    status: resultsMap.size > 0 ? 'available' : 'available',
+    status: (resultsMap.size > 0 ? 'available' : 'available') as SourceHealthStatus,
   };
+  setCachedConnectorData(cacheKey, resObj);
+  return resObj;
 }
 
 // -------------------------------------------------------------

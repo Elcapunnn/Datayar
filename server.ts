@@ -341,13 +341,44 @@ function safeJsonParse<T = any>(str: string): T | null {
   }
 }
 
+// Simple in-memory rate limiter middleware for Render deployment
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute window
+  const maxRequests = 100; // 100 requests per minute
+
+  const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + windowMs;
+  } else {
+    record.count++;
+  }
+  rateLimitMap.set(ip, record);
+
+  if (record.count > maxRequests) {
+    return res.status(429).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests. Please wait a minute before trying again.',
+        retryable: true,
+      },
+    });
+  }
+  next();
+}
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: '5mb' }));
 
-  // Middleware: Attach unique requestId to API requests
+  // Middleware: Rate limiting and Request ID
+  app.use('/api', apiRateLimiter);
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     const reqId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
     res.setHeader('x-request-id', reqId);
@@ -355,7 +386,15 @@ async function startServer() {
     next();
   });
 
-  // Health check endpoint
+  // Render Health Check Endpoint
+  app.get('/health', (req, res) => {
+    res.status(200).json({
+      success: true,
+      status: 'healthy',
+    });
+  });
+
+  // API Health check endpoint
   app.get('/api/health', (req, res) => {
     res.json({
       success: true,
@@ -918,7 +957,7 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Production-grade search server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
