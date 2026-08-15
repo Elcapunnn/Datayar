@@ -1,0 +1,6 @@
+{
+  "name": "Dataset & Git AI Search Agent",
+  "description": "Intelligent search agent across Hugging Face, GitHub, Kaggle, PapersWithCode, and major repositories with AI-powered multi-criteria ranking, dataset evaluation, code snippets, and license analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
