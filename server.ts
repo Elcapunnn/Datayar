@@ -956,7 +956,11 @@ Provide a clear, accurate, engineering-focused answer directly solving the user'
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
     }
-    res.status(200).send('Dataset Search Agent API is running.');
+    const rootIndexPath = path.join(process.cwd(), 'index.html');
+    if (fs.existsSync(rootIndexPath)) {
+      return res.sendFile(rootIndexPath);
+    }
+    res.status(200).send('<!DOCTYPE html><html><head><title>Dataset Search Agent</title></head><body><div id="root"></div></body></html>');
   });
 
   // Skip standalone listener on Vercel (handled via Vercel Serverless Functions)

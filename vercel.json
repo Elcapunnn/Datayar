@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -9,10 +14,6 @@
     {
       "source": "/health",
       "destination": "/api/index.ts"
-    },
-    {
-      "source": "/((?!api/|health).*)",
-      "destination": "/index.html"
     }
   ]
 }
