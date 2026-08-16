@@ -232,6 +232,14 @@ export interface BenchmarkSuiteSummary {
   queryResults: BenchmarkMetricResult[];
 }
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+  isError?: boolean;
+}
+
 export interface ConnectorHealthReport {
   huggingface: { status: SourceHealthStatus; message: string; latencyMs?: number };
   github: { status: SourceHealthStatus; message: string; latencyMs?: number };

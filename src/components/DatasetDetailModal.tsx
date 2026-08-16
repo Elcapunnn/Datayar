@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   ExternalLink, 
@@ -7,8 +7,6 @@ import {
   ShieldCheck, 
   AlertTriangle, 
   FileCode, 
-  Send, 
-  Loader2, 
   CheckCircle2, 
   Bookmark,
   Layers,
@@ -16,13 +14,11 @@ import {
   MessageSquareCode,
   Calendar,
   User,
-  Sliders,
-  HelpCircle,
-  Sparkles
+  Sliders
 } from 'lucide-react';
-import { DatasetItem } from '../types';
+import { ChatMessage, DatasetItem } from '../types';
 import { translations } from '../i18n';
-import { fetchJson } from '../utils/api';
+import { TechnicalConsultant } from './TechnicalConsultant';
 
 interface DatasetDetailModalProps {
   item: DatasetItem | null;
@@ -46,10 +42,16 @@ export const DatasetDetailModal: React.FC<DatasetDetailModalProps> = ({
   const [activeSnippetIdx, setActiveSnippetIdx] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  // AI Chat state
-  const [question, setQuestion] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([]);
+  // Consultant transcript, scoped to the asset currently being inspected.
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const itemId = item?.id;
+
+  // Reset the modal view and conversation whenever a different asset is opened.
+  useEffect(() => {
+    setChatMessages([]);
+    setActiveTab('overview');
+    setActiveSnippetIdx(0);
+  }, [itemId]);
 
   if (!item) return null;
 
@@ -57,44 +59,6 @@ export const DatasetDetailModal: React.FC<DatasetDetailModalProps> = ({
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSendQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim() || isAsking) return;
-
-    const userText = question.trim();
-    setQuestion('');
-    setChatHistory((prev) => [...prev, { sender: 'user', text: userText }]);
-    setIsAsking(true);
-
-    try {
-      const res = await fetchJson<{ answer?: string }>('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset: item,
-          question: userText,
-          lang: 'en',
-        }),
-      });
-
-      if (res.ok && res.data) {
-        setChatHistory((prev) => [
-          ...prev, 
-          { sender: 'ai', text: res.data?.answer || 'Analysis completed.' }
-        ]);
-      } else {
-        setChatHistory((prev) => [
-          ...prev, 
-          { sender: 'ai', text: res.error?.message || 'Failed to reach technical consultant. Please retry.' }
-        ]);
-      }
-    } catch (err: any) {
-      setChatHistory((prev) => [...prev, { sender: 'ai', text: `Error: ${err.message}` }]);
-    } finally {
-      setIsAsking(false);
-    }
   };
 
   const getPlatformLabel = (platform: string) => {
@@ -427,56 +391,11 @@ export const DatasetDetailModal: React.FC<DatasetDetailModalProps> = ({
 
           {/* TAB 4: AI TECHNICAL CONSULTANT */}
           {activeTab === 'advisor' && (
-            <div className="space-y-4 flex flex-col h-[350px]">
-              <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
-                {chatHistory.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-zinc-400 space-y-2">
-                    <Sparkles className="w-6 h-6 mx-auto text-indigo-500" />
-                    <p className="font-medium text-zinc-600">Ask the Technical Consultant</p>
-                    <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
-                      Inquire about preprocessing pipelines, PyTorch / Hugging Face integrations, hardware GPU RAM requirements, or licensing compliance.
-                    </p>
-                  </div>
-                ) : (
-                  chatHistory.map((msg, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-xl text-xs max-w-[85%] leading-relaxed ${
-                        msg.sender === 'user'
-                          ? 'ms-auto bg-zinc-900 text-white font-sans'
-                          : 'me-auto bg-white border border-zinc-200 text-zinc-800 shadow-2xs whitespace-pre-wrap font-sans'
-                      }`}
-                    >
-                      {msg.text}
-                    </div>
-                  ))
-                )}
-                {isAsking && (
-                  <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 font-mono">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Analyzing technical parameters...</span>
-                  </div>
-                )}
-              </div>
-
-              <form onSubmit={handleSendQuestion} className="flex gap-2">
-                <input
-                  type="text"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="e.g. How do I fine-tune a model with this dataset in PyTorch?"
-                  className="flex-1 py-2 px-3 text-xs bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-zinc-900"
-                />
-                <button
-                  type="submit"
-                  disabled={isAsking || !question.trim()}
-                  className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Ask</span>
-                </button>
-              </form>
-            </div>
+            <TechnicalConsultant
+              item={item}
+              messages={chatMessages}
+              onMessagesChange={setChatMessages}
+            />
           )}
         </div>
 

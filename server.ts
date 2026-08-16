@@ -64,10 +64,16 @@ async function callGemini({
   prompt,
   systemPrompt,
   jsonMode = false,
+  timeoutMs = 3500,
+  temperature = 0.1,
+  maxOutputTokens,
 }: {
   prompt: string;
   systemPrompt?: string;
   jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string | null> {
   const gemini = getGeminiAI();
   if (!gemini) return null;
@@ -78,7 +84,7 @@ async function callGemini({
 
   try {
     const config: any = {
-      temperature: 0.1,
+      temperature,
       topP: 0.9,
     };
     if (systemPrompt) {
@@ -86,6 +92,9 @@ async function callGemini({
     }
     if (jsonMode) {
       config.responseMimeType = 'application/json';
+    }
+    if (maxOutputTokens) {
+      config.maxOutputTokens = maxOutputTokens;
     }
 
     const generatePromise = gemini.models.generateContent({
@@ -95,7 +104,7 @@ async function callGemini({
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 3500)
+      setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), timeoutMs)
     );
 
     const response = await Promise.race([generatePromise, timeoutPromise]);
@@ -118,10 +127,18 @@ async function callOpenRouter({
   prompt,
   systemPrompt,
   jsonMode = false,
+  timeoutMs = 4500,
+  temperature = 0.2,
+  maxTokens = 800,
+  history = [],
 }: {
   prompt: string;
   systemPrompt?: string;
   jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
+  history?: Array<{ role: string; content: string }>;
 }): Promise<string | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
@@ -135,10 +152,13 @@ async function callOpenRouter({
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
     }
+    for (const turn of history) {
+      messages.push(turn);
+    }
     messages.push({ role: 'user', content: prompt });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -149,10 +169,10 @@ async function callOpenRouter({
         'X-Title': 'AI Dataset Search Agent',
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat',
+        model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
         messages,
-        temperature: 0.2,
-        max_tokens: 800,
+        temperature,
+        max_tokens: maxTokens,
         response_format: jsonMode ? { type: 'json_object' } : undefined,
       }),
       signal: controller.signal,
@@ -182,15 +202,26 @@ async function generateLLMResponse({
   prompt,
   systemPrompt,
   jsonMode = false,
+  timeoutMs,
+  temperature,
+  maxTokens,
+  history = [],
 }: {
   prompt: string;
   systemPrompt?: string;
   jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
+  history?: Array<{ role: string; content: string }>;
 }): Promise<string | null> {
   const geminiResult = await callGemini({
     prompt,
     systemPrompt,
     jsonMode,
+    timeoutMs,
+    temperature,
+    maxOutputTokens: maxTokens,
   });
 
   if (geminiResult) {
@@ -201,6 +232,10 @@ async function generateLLMResponse({
     prompt,
     systemPrompt,
     jsonMode,
+    timeoutMs,
+    temperature,
+    maxTokens,
+    history,
   });
 
   if (openRouterResult) {
@@ -273,56 +308,351 @@ function generateDeterministicSummary({
 }
 
 // Intelligent ML Technical Consultant Fallback Engine
+// Produces structured, professional Markdown grounded strictly in the item's real metadata.
 function generateTechnicalConsultantAnswer(dataset: any, question: string, lang: string): string {
   const q = (question || '').toLowerCase();
-  const title = dataset.title || 'Unknown Dataset';
-  const license = dataset.license || 'Unknown';
+  const title = dataset.title || dataset.sourceId || 'this asset';
+  const sourceId = dataset.sourceId || title;
+  const license = dataset.license || 'unspecified';
   const licenseCat = dataset.licenseCategory || 'unknown';
-  const modality = dataset.modality || 'Text';
+  const modality = dataset.modality || 'text';
+  const platform = dataset.platform || 'huggingface';
+  const isRepo = dataset.itemType === 'code_repository';
+  const url = dataset.canonicalUrl || dataset.url || '';
+  const format = dataset.format || 'standard';
+  const scale = dataset.sampleCount || dataset.sizeStr || 'not reported in platform metadata';
+  const telemetry =
+    typeof dataset.starsOrDownloads === 'number'
+      ? dataset.starsOrDownloads.toLocaleString()
+      : 'n/a';
 
-  if (q.includes('license') || q.includes('commercial') || q.includes('legal') || q.includes('copyright')) {
-    return `License Analysis for "${title}":
-- Registered License: **${license}** (${licenseCat === 'commercial_friendly' ? 'Commercial Ready' : licenseCat === 'non_commercial' ? 'Research Only / Non-Commercial' : 'Requires Manual Legal Review'})
-- Compliance Requirements: Ensure appropriate attribution notice is included in your documentation/model card. Permissive licenses (MIT/Apache) allow proprietary derivation.`;
+  const licenseVerdict =
+    licenseCat === 'commercial_friendly'
+      ? 'Commercial use permitted'
+      : licenseCat === 'non_commercial'
+      ? 'Research / non-commercial only'
+      : 'Requires manual legal review';
+
+  const notice =
+    '\n\n> Generated from verified platform metadata because the language model was unavailable. Figures above are read directly from the source registry.';
+
+  // ---------- Licensing & compliance ----------
+  if (
+    q.includes('license') ||
+    q.includes('licence') ||
+    q.includes('commercial') ||
+    q.includes('legal') ||
+    q.includes('copyright') ||
+    q.includes('compliance')
+  ) {
+    return `## License assessment
+
+**Declared license:** \`${license}\`
+**Classification:** ${licenseVerdict}
+
+### What this means
+${
+  licenseCat === 'commercial_friendly'
+    ? `- Permissive terms allow commercial training, fine-tuning, and redistribution of derived weights.
+- You must preserve the original copyright and license notice in your distribution.
+- No copyleft obligation is triggered on your own source code.`
+    : licenseCat === 'non_commercial'
+    ? `- Commercial deployment of this asset, or of models trained on it, is **not** permitted without an explicit grant from the rights holder.
+- Internal research, benchmarking, and academic publication are generally acceptable.
+- Copyleft or share-alike terms may force you to publish derivative artifacts under the same license.`
+    : `- The license could not be resolved to a standard SPDX identifier, so no commercial assumption is safe.
+- Review the \`LICENSE\` file and any dataset card terms directly at the source before use.
+- Treat this as restricted until legal review confirms otherwise.`
+}
+
+### Recommended actions
+1. Open the canonical source and read the license text in full: ${url || 'see the platform listing'}
+2. Record the license and the exact revision or commit SHA in your model card for audit traceability.
+3. If the terms are ambiguous or custom, obtain written clarification before any production release.${notice}`;
   }
 
-  if (q.includes('load') || q.includes('python') || q.includes('import') || q.includes('code') || q.includes('script')) {
-    if (dataset.platform === 'huggingface') {
-      return `Python Loading Guide for "${title}":
+  // ---------- Loading / integration code ----------
+  if (
+    q.includes('load') ||
+    q.includes('python') ||
+    q.includes('import') ||
+    q.includes('code') ||
+    q.includes('script') ||
+    q.includes('install') ||
+    q.includes('setup') ||
+    q.includes('clone') ||
+    q.includes('download')
+  ) {
+    if (platform === 'huggingface') {
+      return `## Loading \`${sourceId}\`
+
+### Standard load (cached to disk)
 \`\`\`python
 from datasets import load_dataset
 
-# Load standard dataset with automatic disk caching
-dataset = load_dataset("${dataset.sourceId || title}")
-print(dataset)
-print("Sample item:", dataset['train'][0] if 'train' in dataset else dataset)
+ds = load_dataset("${sourceId}")
+print(ds)                 # inspect available splits
+print(ds["train"][0])     # inspect one record
 \`\`\`
-Tip: Use \`streaming=True\` inside \`load_dataset()\` for zero-disk memory-efficient streaming.`;
+
+### Streaming load (constant memory)
+Use this when the corpus exceeds available RAM or disk.
+\`\`\`python
+from datasets import load_dataset
+
+ds = load_dataset("${sourceId}", split="train", streaming=True)
+for record in ds.take(5):
+    print(record)
+\`\`\`
+
+### Reproducibility
+Pin the exact revision so re-runs are deterministic.
+\`\`\`python
+ds = load_dataset("${sourceId}", revision="<commit-sha>")
+\`\`\`
+
+**Reported scale:** ${scale}
+**Storage format:** \`${format}\`${notice}`;
     }
 
-    if (dataset.platform === 'github') {
-      return `Repository Setup for "${title}":
+    if (platform === 'github') {
+      const repoName = String(sourceId).split('/')[1] || 'repository';
+      return `## Setting up \`${sourceId}\`
+
+### Clone and install
 \`\`\`bash
-git clone ${dataset.canonicalUrl || `https://github.com/${dataset.sourceId}`}
-cd ${dataset.sourceId?.split('/')[1] || ''}
+git clone ${url || `https://github.com/${sourceId}`}.git
+cd ${repoName}
+
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
+
 pip install -r requirements.txt
 \`\`\`
-Check the repository README for environment dependencies and model checkpoints.`;
+
+### Pin a known-good commit
+\`\`\`bash
+git checkout <commit-sha>
+\`\`\`
+
+### Before you run
+- Read the repository \`README\` for the required Python and CUDA versions.
+- Check for a \`setup.py\` or \`pyproject.toml\`; if present, prefer \`pip install -e .\`.
+- Confirm whether pretrained checkpoints are downloaded separately.
+
+**Primary language:** ${format}
+**Community signal:** ${telemetry} stars${notice}`;
+    }
+
+    if (platform === 'openml') {
+      const did = String(sourceId).split('/').pop();
+      return `## Loading OpenML dataset \`${sourceId}\`
+
+### scikit-learn
+\`\`\`python
+from sklearn.datasets import fetch_openml
+
+X, y = fetch_openml(data_id=${did}, return_X_y=True, as_frame=True)
+print(X.shape, y.value_counts())
+\`\`\`
+
+### OpenML client (full metadata)
+\`\`\`python
+import openml
+
+dataset = openml.datasets.get_dataset(${did})
+X, y, categorical, names = dataset.get_data(
+    dataset_format="dataframe",
+    target=dataset.default_target_attribute,
+)
+\`\`\`
+
+**Reported scale:** ${scale}
+**Format:** \`${format}\`${notice}`;
+    }
+
+    if (platform === 'kaggle') {
+      return `## Downloading \`${sourceId}\`
+
+### Kaggle CLI
+\`\`\`bash
+pip install kaggle
+# Place kaggle.json in ~/.kaggle/ with 600 permissions
+kaggle datasets download -d ${sourceId}
+unzip ${String(sourceId).split('/')[1] || 'dataset'}.zip -d data/
+\`\`\`
+
+### Load into pandas
+\`\`\`python
+import pandas as pd
+
+df = pd.read_csv("data/<file>.csv")
+print(df.info())
+\`\`\`
+
+**License:** \`${license}\` (${licenseVerdict})${notice}`;
     }
   }
 
-  if (q.includes('preprocess') || q.includes('clean') || q.includes('split') || q.includes('normalize')) {
-    return `Preprocessing Guidelines for ${modality} Data in "${title}":
-1. **Data Sanitization**: Filter missing/corrupted records and normalize whitespace/values.
-2. **Dataset Splits**: Apply an 80/10/10 Stratified Split for training, validation, and testing.
-3. **Feature Scaling / Tokenization**: Apply tokenizer matching your target model architecture.`;
+  // ---------- Preprocessing & splits ----------
+  if (
+    q.includes('preprocess') ||
+    q.includes('clean') ||
+    q.includes('split') ||
+    q.includes('normalize') ||
+    q.includes('augment') ||
+    q.includes('tokenize')
+  ) {
+    const modalitySteps: Record<string, string> = {
+      vision: `1. **Decode and validate** — drop truncated or corrupt images before batching.
+2. **Resize consistently** — resize to the resolution expected by your backbone (commonly 224x224).
+3. **Normalize** — apply the mean and standard deviation of the pretraining corpus, not of this dataset.
+4. **Augment training only** — random resized crop, horizontal flip, and mild color jitter; never augment validation or test.`,
+      audio: `1. **Resample** — convert every clip to a single sample rate (16 kHz for most speech models).
+2. **Normalize loudness** — apply peak or RMS normalization to reduce amplitude variance.
+3. **Extract features** — compute log-mel spectrograms or use the model's own feature extractor.
+4. **Pad and mask** — batch variable-length clips with explicit attention masks.`,
+      tabular: `1. **Handle missing values** — impute numerics by median, categoricals by an explicit "missing" category.
+2. **Encode categoricals** — one-hot for low cardinality, target or ordinal encoding for high cardinality.
+3. **Scale numerics** — standardize for linear and neural models; tree ensembles do not require it.
+4. **Prevent leakage** — fit every transformer on the training split only, then apply to validation and test.`,
+      nlp: `1. **Normalize text** — unify whitespace and Unicode, and strip control characters.
+2. **Deduplicate** — remove near-duplicate records to avoid inflated evaluation scores.
+3. **Tokenize with the target tokenizer** — never mix tokenizers between training and inference.
+4. **Control sequence length** — measure the token length distribution before fixing \`max_length\`.`,
+    };
+
+    const steps =
+      modalitySteps[modality] ||
+      modalitySteps[modality === 'multimodal' ? 'vision' : 'nlp'] ||
+      modalitySteps.nlp;
+
+    return `## Preprocessing plan for \`${sourceId}\`
+
+**Modality:** ${String(modality).toUpperCase()} · **Format:** \`${format}\` · **Scale:** ${scale}
+
+### Pipeline
+${steps}
+
+### Split strategy
+- If the source already ships \`train\` / \`validation\` / \`test\` splits, use them so your numbers stay comparable to published results.
+- Otherwise use a **stratified 80 / 10 / 10** split with a fixed seed.
+- Split by group (patient, speaker, document, user) whenever records share a source, or your metrics will be optimistic.
+
+\`\`\`python
+from sklearn.model_selection import train_test_split
+
+train, temp = train_test_split(data, test_size=0.2, random_state=42, stratify=labels)
+val, test = train_test_split(temp, test_size=0.5, random_state=42)
+\`\`\`
+
+### Verify before training
+- Confirm the label distribution is preserved across all three splits.
+- Assert zero overlap of identifiers between splits.${notice}`;
   }
 
-  return `The resource "${title}" (${modality}) with license ${license} (Quality Score: ${dataset.aiScore || 85}/100) is ready for your ML engineering workflow.
-- Modality: ${modality}
-- Storage Format: ${dataset.format || 'Standard'}
-- Canonical URL: ${dataset.canonicalUrl || dataset.url}
-Refer to the Python Loader tab for copy-paste execution code with automatic streaming support.`;
+  // ---------- Hardware planning ----------
+  if (
+    q.includes('gpu') ||
+    q.includes('vram') ||
+    q.includes('memory') ||
+    q.includes('ram') ||
+    q.includes('hardware') ||
+    q.includes('disk') ||
+    q.includes('cost')
+  ) {
+    return `## Hardware planning for \`${sourceId}\`
+
+**Reported scale:** ${scale} · **Format:** \`${format}\` · **Modality:** ${String(modality).toUpperCase()}
+
+### Sizing guidance
+- **Disk** — provision roughly three times the raw asset size to cover the download, the extracted copy, and the cache.
+- **System RAM** — required only for the active batch when streaming; full in-memory loading needs RAM greater than the dataset size.
+- **GPU VRAM** — driven by the model and batch size rather than by the dataset. As a rough guide: a 7B parameter model needs about 16 GB for LoRA fine-tuning, and roughly 80 GB for full fine-tuning in bf16.
+
+### Reduce the footprint
+1. Stream instead of materializing: \`load_dataset(..., streaming=True)\`.
+2. Enable gradient accumulation to emulate a large batch on a small GPU.
+3. Enable gradient checkpointing to trade compute for memory.
+4. Use mixed precision (bf16 where supported, otherwise fp16).
+
+### Measure, do not guess
+Profile one epoch on a 1% subsample first, then extrapolate throughput and cost.${notice}`;
+  }
+
+  // ---------- Training / fine-tuning ----------
+  if (
+    q.includes('train') ||
+    q.includes('fine-tune') ||
+    q.includes('finetune') ||
+    q.includes('hyperparameter') ||
+    q.includes('model') ||
+    q.includes('baseline') ||
+    q.includes('evaluate') ||
+    q.includes('metric')
+  ) {
+    const baselines: Record<string, string> = {
+      vision: 'a pretrained ViT or ConvNeXt backbone with a fresh classification head',
+      audio: 'a pretrained Wav2Vec2 or Whisper encoder with a task-specific head',
+      tabular: 'gradient-boosted trees (XGBoost or LightGBM) as the baseline before any neural model',
+      nlp: 'a compact encoder such as DeBERTa-v3-base for classification, or a small instruction-tuned decoder for generation',
+      code: 'an existing reference implementation from the repository before writing your own',
+      multimodal: 'a CLIP-style dual encoder or an existing vision-language checkpoint',
+    };
+
+    return `## Training approach for \`${sourceId}\`
+
+**Modality:** ${String(modality).toUpperCase()} · **Scale:** ${scale} · **License:** \`${license}\` (${licenseVerdict})
+
+### Recommended starting point
+Begin with ${baselines[modality] || baselines.nlp}. Establish that baseline before adding complexity, so every later change has a measurable reference.
+
+### Starting hyperparameters
+| Parameter | Suggested value |
+| --- | --- |
+| Learning rate | 2e-5 for full fine-tuning, 1e-4 for LoRA |
+| Batch size | Largest that fits, then use gradient accumulation |
+| Epochs | 3 to 5, with early stopping on validation loss |
+| Scheduler | Linear or cosine decay with 5% warmup |
+| Precision | bf16 where the GPU supports it |
+
+### Evaluation discipline
+1. Choose the metric before training: macro-F1 for imbalanced classification, not raw accuracy.
+2. Hold the test split back until the model is final; tune only against validation.
+3. Report the mean and variance across at least three seeds.
+4. Compare against published numbers for this asset where they exist.
+
+${
+  licenseCat !== 'commercial_friendly'
+    ? `> **License constraint:** \`${license}\` restricts commercial deployment. Confirm your obligations before shipping trained weights.`
+    : `> **License:** \`${license}\` permits commercial use of derived weights with attribution preserved.`
+}${notice}`;
+  }
+
+  // ---------- Default overview ----------
+  return `## ${isRepo ? 'Repository' : 'Dataset'} overview: \`${sourceId}\`
+
+| Attribute | Value |
+| --- | --- |
+| Platform | ${platform} |
+| Type | ${isRepo ? 'Code repository' : 'Dataset'} |
+| Modality | ${String(modality).toUpperCase()} |
+| Format | \`${format}\` |
+| Scale | ${scale} |
+| License | \`${license}\` (${licenseVerdict}) |
+| Community signal | ${telemetry} |
+| Last updated | ${dataset.lastUpdated || 'not reported'} |
+
+### Summary
+${dataset.description || `${sourceId} is a verified ${isRepo ? 'code repository' : 'dataset'} retrieved from ${platform}.`}
+
+### Suggested next questions
+- How do I load or install this, with production-ready code?
+- What preprocessing and split strategy should I use?
+- Can I use this commercially under \`${license}\`?
+- What GPU and memory budget should I plan for?
+
+Full source: ${url || 'see the platform listing'}${notice}`;
 }
 
 function safeJsonParse<T = any>(str: string): T | null {
@@ -867,10 +1197,36 @@ Provide a strict JSON response with:
   // -------------------------------------------------------------
   // 4. AI TECHNICAL CONSULTANT ENDPOINT
   // -------------------------------------------------------------
+  const CONSULTANT_SYSTEM_PROMPT = `You are a Principal Machine Learning Engineer acting as a technical consultant inside a dataset discovery platform. You advise practitioners on how to actually use a specific dataset or code repository.
+
+VOICE AND STANDARDS
+- Write like a senior engineer briefing a colleague: precise, direct, and decisive.
+- Lead with the answer. Never open with pleasantries, restatements of the question, or "Great question".
+- Recommend a specific course of action instead of listing every possibility.
+- State uncertainty explicitly when the provided metadata does not cover something. Never fill gaps with invented facts.
+
+GROUNDING RULES (STRICT)
+- Use only the asset metadata supplied in the context block for facts about this asset.
+- Never invent download counts, sample counts, file sizes, benchmark scores, dates, authors, or URLs.
+- The only URL you may cite for this asset is the canonical URL given in the context.
+- If the metadata is missing a detail the user asks about, say so plainly and explain how to verify it at the source.
+- General machine learning engineering knowledge (frameworks, hyperparameters, memory behaviour, licensing implications) is expected and encouraged.
+
+OUTPUT FORMAT (MARKDOWN, ALWAYS)
+- Open with a short bold verdict line or a two-sentence direct answer.
+- Organise the rest under \`###\` subheadings when the answer has more than one part.
+- Use numbered lists for ordered procedures and bullet lists for parallel options.
+- Put every code example in a fenced block with a language tag (\`\`\`python, \`\`\`bash).
+- Code must be runnable and reference the real asset identifier from the context.
+- Use a markdown table only for genuine attribute or option comparisons.
+- Bold the key terms that carry the decision. Use \`inline code\` for identifiers, parameters, and file names.
+- Target 120 to 280 words unless the question genuinely requires more. Never pad.
+- Do not close with an offer of further help or a summary of what you just said.`;
+
   app.post('/api/ai-chat', async (req: Request, res: Response) => {
     const requestId = (req as any).requestId;
     try {
-      const { dataset, question } = req.body;
+      const { dataset, question, history } = req.body;
       if (!dataset || !question) {
         const errResp: ApiErrorResponse = {
           success: false,
@@ -880,34 +1236,84 @@ Provide a strict JSON response with:
         return res.status(400).json(errResp);
       }
 
-      const prompt = `You are a Senior ML Engineer and Data Architect.
-The user is inspecting this dataset/repository:
-- Title: ${dataset.title}
-- Source ID: ${dataset.sourceId}
-- Canonical URL: ${dataset.canonicalUrl || dataset.url}
-- Modality: ${dataset.modality}
-- License: ${dataset.license} (${dataset.licenseCategory})
-- Stars/Downloads: ${dataset.starsOrDownloads}
-- Description: ${dataset.description}
-- Format: ${dataset.format || 'Standard'}
+      // Normalize prior turns so follow-up questions keep their context.
+      const priorTurns: Array<{ role: string; content: string }> = Array.isArray(history)
+        ? history
+            .filter(
+              (turn: any) =>
+                turn &&
+                (turn.role === 'user' || turn.role === 'assistant') &&
+                typeof turn.content === 'string' &&
+                turn.content.trim().length > 0
+            )
+            .slice(-6)
+            .map((turn: any) => ({
+              role: turn.role === 'assistant' ? 'assistant' : 'user',
+              content: String(turn.content).slice(0, 2000),
+            }))
+        : [];
 
-User Question: "${question}"
+      const licenseVerdict =
+        dataset.licenseCategory === 'commercial_friendly'
+          ? 'commercial use permitted'
+          : dataset.licenseCategory === 'non_commercial'
+          ? 'research / non-commercial only'
+          : 'requires manual legal review';
 
-Provide a clear, accurate, engineering-focused answer directly solving the user's inquiry (e.g. data preprocessing, model training, loading scripts, split recommendations, or commercial license safety). Do not hallucinate URLs or features.`;
+      const contextBlock = `ASSET CONTEXT (verified platform metadata - the only source of truth for this asset)
+- Identifier: ${dataset.sourceId}
+- Type: ${dataset.itemType === 'code_repository' ? 'code repository' : 'dataset'}
+- Platform: ${dataset.platform}
+- Author / organisation: ${dataset.authorOrOrg || 'not reported'}
+- Canonical URL: ${dataset.canonicalUrl || dataset.url || 'not reported'}
+- Modality: ${dataset.modality || 'not reported'}
+- Storage format: ${dataset.format || 'not reported'}
+- Reported scale: ${dataset.sampleCount || dataset.sizeStr || 'not reported'}
+- Community signal: ${
+        typeof dataset.starsOrDownloads === 'number'
+          ? `${dataset.starsOrDownloads.toLocaleString()} ${dataset.platform === 'github' ? 'stars' : 'downloads'}`
+          : 'not reported'
+      }
+- License: ${dataset.license || 'unspecified'} (${licenseVerdict})
+- Last updated: ${dataset.lastUpdated || 'not reported'}
+- Tags: ${Array.isArray(dataset.tags) && dataset.tags.length > 0 ? dataset.tags.slice(0, 10).join(', ') : 'none reported'}
+- Description: ${dataset.description || 'not reported'}`;
 
+      const conversationBlock =
+        priorTurns.length > 0
+          ? `\n\nCONVERSATION SO FAR (most recent last)\n${priorTurns
+              .map((turn) => `${turn.role === 'user' ? 'User' : 'Consultant'}: ${turn.content}`)
+              .join('\n\n')}`
+          : '';
+
+      const prompt = `${contextBlock}${conversationBlock}
+
+CURRENT QUESTION
+${question}
+
+Answer the current question directly, following your output format rules. Ground every claim about this asset in the context block above.`;
+
+      // The conversation is embedded in the prompt above so both providers
+      // receive identical context; no separate message history is needed.
       let answer = await generateLLMResponse({
         prompt,
-        systemPrompt: 'You are an ML data architect. Answer concisely and accurately in English.',
+        systemPrompt: CONSULTANT_SYSTEM_PROMPT,
+        timeoutMs: 12000,
+        temperature: 0.3,
+        maxTokens: 1400,
       });
 
+      let source: 'llm' | 'deterministic' = 'llm';
       if (!answer || answer.trim().length === 0) {
         answer = generateTechnicalConsultantAnswer(dataset, question, 'en');
+        source = 'deterministic';
       }
 
       res.json({
         success: true,
         requestId,
         answer,
+        source,
       });
     } catch (err: any) {
       console.error('AI chat error:', err);
