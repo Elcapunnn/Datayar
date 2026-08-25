@@ -49,6 +49,9 @@ function getGeminiAI(): GoogleGenAI | null {
 // Rate limit and backoff management for external LLMs
 let geminiCooldownUntil = 0;
 let openRouterCooldownUntil = 0;
+let groqCooldownUntil = 0;
+let nvidiaCooldownUntil = 0;
+let mistralCooldownUntil = 0;
 
 // In-memory summary cache to prevent redundant LLM invocations for popular queries
 const summaryCache = new Map<string, {
@@ -198,6 +201,215 @@ async function callOpenRouter({
   }
 }
 
+// Groq free-tier caller (OpenAI-compatible, no card required, renews daily)
+async function callGroq({
+  prompt,
+  systemPrompt,
+  jsonMode = false,
+  timeoutMs = 5000,
+  temperature = 0.2,
+  maxTokens = 800,
+}: {
+  prompt: string;
+  systemPrompt?: string;
+  jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  if (Date.now() < groqCooldownUntil) {
+    return null;
+  }
+
+  try {
+    const messages: Array<{ role: string; content: string }> = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: jsonMode ? { type: 'json_object' } : undefined,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      if (res.status === 429) {
+        groqCooldownUntil = Date.now() + 60_000;
+      }
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.trim().length > 0) {
+      return content.trim();
+    }
+    return null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
+// Mistral caller (free Experiment tier, ~1B tokens/month, OpenAI-compatible)
+async function callMistral({
+  prompt,
+  systemPrompt,
+  jsonMode = false,
+  timeoutMs = 5000,
+  temperature = 0.2,
+  maxTokens = 800,
+}: {
+  prompt: string;
+  systemPrompt?: string;
+  jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string | null> {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) return null;
+
+  if (Date.now() < mistralCooldownUntil) {
+    return null;
+  }
+
+  try {
+    const messages: Array<{ role: string; content: string }> = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        model: process.env.MISTRAL_MODEL || 'mistral-small-latest',
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: jsonMode ? { type: 'json_object' } : undefined,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      if (res.status === 429) {
+        mistralCooldownUntil = Date.now() + 60_000;
+      }
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.trim().length > 0) {
+      return content.trim();
+    }
+    return null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
+// NVIDIA NIM caller (OpenAI-compatible, free prototyping, ~40 RPM, no daily cap)
+async function callNvidia({
+  prompt,
+  systemPrompt,
+  jsonMode = false,
+  timeoutMs = 5000,
+  temperature = 0.2,
+  maxTokens = 800,
+}: {
+  prompt: string;
+  systemPrompt?: string;
+  jsonMode?: boolean;
+  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
+}): Promise<string | null> {
+  const apiKey = process.env.NVIDIA_API_KEY;
+  if (!apiKey) return null;
+
+  if (Date.now() < nvidiaCooldownUntil) {
+    return null;
+  }
+
+  try {
+    const messages: Array<{ role: string; content: string }> = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        model: process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct',
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: jsonMode ? { type: 'json_object' } : undefined,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      if (res.status === 429) {
+        nvidiaCooldownUntil = Date.now() + 60_000;
+      }
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.trim().length > 0) {
+      return content.trim();
+    }
+    return null;
+  } catch (err: any) {
+    return null;
+  }
+}
+
 async function generateLLMResponse({
   prompt,
   systemPrompt,
@@ -240,6 +452,45 @@ async function generateLLMResponse({
 
   if (openRouterResult) {
     return openRouterResult;
+  }
+
+  const mistralResult = await callMistral({
+    prompt,
+    systemPrompt,
+    jsonMode,
+    timeoutMs,
+    temperature,
+    maxTokens,
+  });
+
+  if (mistralResult) {
+    return mistralResult;
+  }
+
+  const nvidiaResult = await callNvidia({
+    prompt,
+    systemPrompt,
+    jsonMode,
+    timeoutMs,
+    temperature,
+    maxTokens,
+  });
+
+  if (nvidiaResult) {
+    return nvidiaResult;
+  }
+
+  const groqResult = await callGroq({
+    prompt,
+    systemPrompt,
+    jsonMode,
+    timeoutMs,
+    temperature,
+    maxTokens,
+  });
+
+  if (groqResult) {
+    return groqResult;
   }
 
   return null;
