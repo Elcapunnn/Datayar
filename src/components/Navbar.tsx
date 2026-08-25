@@ -3,12 +3,10 @@ import {
   Bookmark, 
   Layers, 
   Download, 
-  Database,
-  Sparkles,
-  Activity,
-  Cpu
+  Sparkles
 } from 'lucide-react';
 import { translations } from '../i18n';
+import { LogoIcon, LogoWordmark } from './Logo';
 
 interface NavbarProps {
   bookmarksCount: number;
@@ -32,18 +30,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
         {/* Brand & Logo */}
         <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 ring-1 ring-white/20">
-            <Cpu className="w-4.5 h-4.5 text-white" />
+          <div className="relative">
+            <LogoIcon className="w-9 h-9 drop-shadow-sm" />
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-white animate-pulse" />
           </div>
 
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-bold tracking-tight text-slate-900 font-sans">
-                DataSet & Git AI <span className="text-indigo-600 font-extrabold">Agent</span>
-              </span>
-              <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full font-mono">
-                <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
+              <LogoWordmark className="h-5 sm:h-6 w-auto" />
+              <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-full font-mono">
+                <Sparkles className="w-2.5 h-2.5 text-teal-500" />
                 <span>v2.5 Production</span>
               </span>
             </div>
