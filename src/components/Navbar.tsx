@@ -2,8 +2,7 @@ import React from 'react';
 import { 
   Bookmark, 
   Layers, 
-  Download, 
-  Sparkles
+  Download
 } from 'lucide-react';
 import { translations } from '../i18n';
 import { LogoIcon, LogoWordmark } from './Logo';
@@ -36,16 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <LogoWordmark className="h-5 sm:h-6 w-auto" />
-              <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-full font-mono">
-                <Sparkles className="w-2.5 h-2.5 text-teal-500" />
-                <span>v2.5 Production</span>
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 hidden sm:inline font-mono">
-              HuggingFace • GitHub • OpenML • Kaggle
-            </span>
+            <LogoWordmark className="h-5 sm:h-6 w-auto" />
           </div>
         </div>
 
