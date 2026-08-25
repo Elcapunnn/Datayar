@@ -461,10 +461,15 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-semibold text-slate-700">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>Dataset & Code AI Discovery Platform</span>
-          </div>
-          <div className="text-slate-400 text-[11px] font-mono">
-            Hugging Face • GitHub • OpenML • Kaggle • Zero-Hallucination Retrieval
+            <span>© {new Date().getFullYear()} DataYar — developed by</span>
+            <a
+              href="https://github.com/Elcapunnn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 hover:text-indigo-800 hover:underline font-mono font-semibold transition-colors"
+            >
+              Elcapunnn
+            </a>
           </div>
         </div>
       </footer>
