@@ -4,7 +4,7 @@
 
 Search once, get verified results from **Hugging Face, GitHub, OpenML, and Kaggle** — ranked by an AI quality score, with license analysis, executive summaries, comparison matrices, and a built-in technical consultant that tells you how to actually load and use each dataset.
 
-🔗 **Live:** https://dadehyar.vercel.app
+🔗 **Live:** https://datayar.vercel.app
 
 ---
 
