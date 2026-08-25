@@ -1,4 +1,4 @@
-# DataYar — داده‌یار
+# DataYar 
 
 **AI-powered discovery engine for datasets & code repositories.**
 
